@@ -13,6 +13,7 @@ end
 status is-interactive; or return
 
 set -g WHAT_CHANGED_MAXDEPTH 1
+set -g WHAT_CHANGED_VERBOSE 1
 set -g WHAT_CHANGED_DISABLED 0
 set -g _what_changed_directory_contents_before_command
 set -g _what_changed_last_directory $PWD
@@ -20,7 +21,6 @@ set -g _what_changed_last_directory $PWD
 function whatchanged
     set -l argc (count $argv)
     if test $argc -eq 0
-
         return
     end
 
@@ -32,6 +32,10 @@ function whatchanged
             set WHAT_CHANGED_DISABLED 0
         case off
             set WHAT_CHANGED_DISABLED 1
+        case status
+            echo "WHAT_CHANGED_DISABLED: $WHAT_CHANGED_DISABLED"
+            echo "WHAT_CHANGED_MAXDEPTH: $WHAT_CHANGED_MAXDEPTH"
+            echo "WHAT_CHANGED_VERBOSE: $WHAT_CHANGED_VERBOSE"
 
     end
     if test $WHAT_CHANGED_DISABLED -eq 1
@@ -48,21 +52,59 @@ end
 function _what_changed_preexec --on-event fish_preexec
     test $WHAT_CHANGED_DISABLED -eq 1; and return
     test $_what_changed_last_directory = $PWD; or return # don't run if we've changed directories
-    set _what_changed_directory_contents_before_command # clear it
-    for it in * .*
-        set -a _what_changed_directory_contents_before_command $it
-    end
+    set _what_changed_directory_contents_before_command * .*
 end
 
 function _what_changed_postexec --on-event fish_postexec
     test $WHAT_CHANGED_DISABLED -eq 1; and return
     test $_what_changed_last_directory = $PWD; or return # don't run if we've changed directories
-    set -l directory_contents_after_command
-    for it in * .*
-        set -a directory_contents_after_command $it
-    end
+    set -l directory_contents_after_prompt * .*
+    set -l deleted
     for it in $_what_changed_directory_contents_before_command
-        contains -- $it $directory_contents_after_command; and continue
+        set -l idx (contains --index -- $it $directory_contents_after_prompt)
+        if test $status -eq 0
+            set -e directory_contents_after_prompt[$idx]
+            continue
+        end
+        set -a deleted $it
+        set_color red
         echo "deleted file: $it"
+        set_color normal
+    end
+
+    # Will be empty if no files were deleted
+    for it in $directory_contents_after_prompt
+        set -l color
+        set -l prefix
+        if test -f $it
+            set color green
+            set prefix "new file: "
+        else if test -d $it
+            set color blue
+            set prefix "new directory: "
+        else if test -L $it
+            set color cyan
+            set prefix "new symlink: "
+        else if test -p $it
+            set color yellow
+            set prefix "new pipe: "
+        else if test -S $it
+            set color magenta
+            set prefix "new socket: "
+        else if test -b $it
+            set color red
+            set prefix "new block device: "
+
+        else if test -c $it
+            set color red
+            set prefix "new character device: "
+        else
+            echo "new unknown file type: $it"
+            set_color red
+            echo "SHOULD NOT BE POSSIBLE!"
+            set_color normal
+        end
+
+        printf "%s%s%s\n" (set_color $color) $prefix $it
     end
 end
