@@ -15,6 +15,7 @@ status is-interactive; or return
 set -g WHAT_CHANGED_MAXDEPTH 1
 set -g WHAT_CHANGED_VERBOSE 1
 set -g WHAT_CHANGED_DISABLED 0
+# _what_changed_ is used as a namespace prefix for variables, to avoid collisions
 set -g _what_changed_directory_contents_before_command
 set -g _what_changed_last_directory $PWD
 
@@ -45,19 +46,20 @@ function whatchanged
     end
 end
 
-function _what_changed_on_PWD_update --on-variable PWD
-    set _what_changed_last_directory $PWD
+if test $WHAT_CHANGED_DISABLED -eq 1
+    return
 end
 
 function _what_changed_preexec --on-event fish_preexec
-    test $WHAT_CHANGED_DISABLED -eq 1; and return
-    test $_what_changed_last_directory = $PWD; or return # don't run if we've changed directories
+    test $_what_changed_last_directory != $PWD; and return # don't run if we've changed directories
     set _what_changed_directory_contents_before_command * .*
 end
 
 function _what_changed_postexec --on-event fish_postexec
-    test $WHAT_CHANGED_DISABLED -eq 1; and return
-    test $_what_changed_last_directory = $PWD; or return # don't run if we've changed directories
+    if test $_what_changed_last_directory != $PWD
+        set _what_changed_last_directory $PWD
+        return # don't run if we've changed directories
+    end
     set -l directory_contents_after_prompt * .*
     set -l deleted
     for it in $_what_changed_directory_contents_before_command
@@ -78,18 +80,20 @@ function _what_changed_postexec --on-event fish_postexec
         set -l prefix
         if test -f $it
             set color green
-            set prefix "new file: "
+            set prefix "new : "
         else if test -d $it
             set color blue
-            set prefix "new directory: "
+            set prefix "new : "
         else if test -L $it
             set color cyan
-            set prefix "new symlink: "
+            # TODO: <kpbaks 2023-07-07 09:53:12> symlink file or symlink directory?
+            set prefix "new : "
         else if test -p $it
             set color yellow
-            set prefix "new pipe: "
+            set prefix "new 󰟦: "
         else if test -S $it
             set color magenta
+            # 󱄇
             set prefix "new socket: "
         else if test -b $it
             set color red
