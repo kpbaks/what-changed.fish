@@ -13,7 +13,7 @@ end
 status is-interactive; or return
 
 set -g WHAT_CHANGED_MAXDEPTH 1
-set -g WHAT_CHANGED_VERBOSE 1
+set -g WHAT_CHANGED_VERBOSE 0
 set -g WHAT_CHANGED_DISABLED 0
 # _what_changed_ is used as a namespace prefix for variables, to avoid collisions
 set -g _what_changed_directory_contents_before_command
@@ -50,6 +50,78 @@ if test $WHAT_CHANGED_DISABLED -eq 1
     return
 end
 
+function _what_changed_print_deleted_objects --argument-names deleted
+    set -l deleted $argv
+    if test $WHAT_CHANGED_VERBOSE -eq 1
+        for it in $deleted
+            set_color red
+            echo "deleted file: $it"
+            set_color normal
+        end
+    else
+        set -l deleted_count (count $deleted)
+        if test $deleted_count -gt 0
+            set_color red
+            echo "deleted $deleted_count files"
+            set_color normal
+        end
+    end
+end
+
+function prompt_what_changed
+
+end
+
+function _what_changed_print_created_objects
+    set -l created $argv
+    if test $WHAT_CHANGED_VERBOSE -eq 1
+        for it in $created
+            set -l color
+            set -l prefix
+            if test -f $it
+                set color green
+                set prefix "new : "
+            else if test -d $it
+                set color blue
+                set prefix "new : "
+            else if test -L $it
+                set color cyan
+                # TODO: <kpbaks 2023-07-07 09:53:12> symlink file or symlink directory?
+                set prefix "new : "
+            else if test -p $it
+                set color yellow
+                set prefix "new 󰟦: "
+            else if test -S $it
+                set color magenta
+                # 󱄇
+                set prefix "new socket: "
+            else if test -b $it
+                set color red
+                set prefix "new block device: "
+
+            else if test -c $it
+                set color red
+                set prefix "new character device: "
+            else
+                echo "new unknown file type: $it"
+                set_color red
+                echo "SHOULD NOT BE POSSIBLE!"
+                set_color normal
+            end
+
+            printf "%s%s%s\n" (set_color $color) $prefix $it
+        end
+    else
+        set -l created_count (count $created)
+        set -l postfix (test $created_count -eq 1; and echo "file"; or echo "files")
+        if test $created_count -gt 0
+            set_color green
+            echo "created $created_count $postfix"
+            set_color normal
+        end
+    end
+end
+
 function _what_changed_preexec --on-event fish_preexec
     test $_what_changed_last_directory != $PWD; and return # don't run if we've changed directories
     set _what_changed_directory_contents_before_command * .*
@@ -60,6 +132,7 @@ function _what_changed_postexec --on-event fish_postexec
         set _what_changed_last_directory $PWD
         return # don't run if we've changed directories
     end
+
     set -l directory_contents_after_prompt * .*
     set -l deleted
     for it in $_what_changed_directory_contents_before_command
@@ -69,46 +142,10 @@ function _what_changed_postexec --on-event fish_postexec
             continue
         end
         set -a deleted $it
-        set_color red
-        echo "deleted file: $it"
-        set_color normal
     end
+
+    _what_changed_print_deleted_objects $deleted
 
     # Will be empty if no files were deleted
-    for it in $directory_contents_after_prompt
-        set -l color
-        set -l prefix
-        if test -f $it
-            set color green
-            set prefix "new : "
-        else if test -d $it
-            set color blue
-            set prefix "new : "
-        else if test -L $it
-            set color cyan
-            # TODO: <kpbaks 2023-07-07 09:53:12> symlink file or symlink directory?
-            set prefix "new : "
-        else if test -p $it
-            set color yellow
-            set prefix "new 󰟦: "
-        else if test -S $it
-            set color magenta
-            # 󱄇
-            set prefix "new socket: "
-        else if test -b $it
-            set color red
-            set prefix "new block device: "
-
-        else if test -c $it
-            set color red
-            set prefix "new character device: "
-        else
-            echo "new unknown file type: $it"
-            set_color red
-            echo "SHOULD NOT BE POSSIBLE!"
-            set_color normal
-        end
-
-        printf "%s%s%s\n" (set_color $color) $prefix $it
-    end
+    _what_changed_print_created_objects $directory_contents_after_prompt
 end
