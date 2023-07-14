@@ -20,7 +20,7 @@ set -g WHAT_CHANGED_DISABLED 0
 set -g _what_changed_directory_contents_before_command * .*
 set -g _what_changed_last_directory $PWD
 # set -g _what_changed_echo_prefix "[what-changed.fish]"
-set -g _what_changed_echo_prefix (printf "[%swhat%s-%schanged%s.fish]" (set_color green) (set_color normal) (set_color red) (set_color normal))
+set -g _what_changed_echo_prefix (printf "[%swhat%s-%schanged%s.%sfish%s]" (set_color green) (set_color normal) (set_color red) (set_color normal) (set_color yellow) (set_color normal))
 
 function whatchanged
     set -l options (fish_opt --short=h --long=help)
@@ -226,7 +226,7 @@ function _what_changed_postexec --on-event fish_postexec
         set _what_changed_last_directory $PWD
         return # don't run if we've changed directories
     end
-
+    # TODO: <kpbaks 2023-07-14 09:11:14> if a directory is created, then recursively check it
     set -l directory_contents_after_prompt * .*
     set -l deleted
     for it in $_what_changed_directory_contents_before_command
