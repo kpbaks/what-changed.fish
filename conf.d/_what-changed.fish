@@ -1,9 +1,19 @@
 status is-interactive; or return
 
-set --global WHAT_CHANGED_MAXDEPTH 1
-set --global WHAT_CHANGED_VERBOSE 0
-set --global WHAT_CHANGED_USE_PREFIX 1
-set --global WHAT_CHANGED_DISABLED 0
+set --global WHAT_CHANGED_DEFAULT_MAXDEPTH 1
+set --global WHAT_CHANGED_DEFAULT_VERBOSE 1
+set --global WHAT_CHANGED_DEFAULT_USE_PREFIX 1
+set --global WHAT_CHANGED_DEFAULT_DISABLED 0
+
+set --query WHAT_CHANGED_MAXDEPTH; or set --global WHAT_CHANGED_MAXDEPTH $WHAT_CHANGED_DEFAULT_MAXDEPTH
+set --query WHAT_CHANGED_VERBOSE; or set --global WHAT_CHANGED_VERBOSE $WHAT_CHANGED_DEFAULT_VERBOSE
+set --query WHAT_CHANGED_USE_PREFIX; or set --global WHAT_CHANGED_USE_PREFIX $WHAT_CHANGED_DEFAULT_USE_PREFIX
+set --query WHAT_CHANGED_DISABLED; or set --global WHAT_CHANGED_DISABLED $WHAT_CHANGED_DEFAULT_DISABLED
+
+# set --global WHAT_CHANGED_MAXDEPTH 1
+# set --global WHAT_CHANGED_VERBOSE 0
+# set --global WHAT_CHANGED_USE_PREFIX 1
+# set --global WHAT_CHANGED_DISABLED 0
 # _what_changed_ is used as a namespace prefix for variables, to avoid collisions
 set --global _what_changed_directory_contents_before_command * .*
 set --global _what_changed_last_directory $PWD
@@ -25,6 +35,7 @@ function whatchanged --description "Manage what-changed.fish plugin"
 
     if set --query _flag_help
         # TODO: use multiple printf instead
+        # TODO: print a contextual help message instead
         set --local usage "$(set_color --bold)Interact with what-changed.fish$(set_color normal)
 
 $(set_color yellow)Usage:$(set_color normal) $(set_color blue)$(status current-command)$(set_color normal) [options] on | off | status
@@ -85,7 +96,7 @@ function __what_changed.fish::print_deleted_objects --argument-names deleted
 
     if test $WHAT_CHANGED_VERBOSE -eq 1
         for it in $deleted
-            printf "%sdeleted file: %s%s\n" $red $it $reset
+            printf " - %s%s%s\n" $red $it $reset
         end
     else
         set --local num_deleted (count $deleted)
@@ -99,9 +110,9 @@ function __what_changed.fish::print_deleted_objects --argument-names deleted
     end
 end
 
-function __what_changed.fish::print_created_objects
-    set --local created $argv
-    test (count $created) -eq 0; and return
+function __what_changed.fish::print_created_objects --argument-names created
+    test (count $created) -eq 0; and return # don't print anything if there are no created objects
+
     if test $WHAT_CHANGED_VERBOSE -eq 1
         for it in $created
             set --local color
